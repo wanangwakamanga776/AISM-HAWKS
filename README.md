@@ -1,64 +1,74 @@
-const db = globalThis.__B44_DB__ || { auth:{ isAuthenticated: async()=>false, me: async()=>null }, entities:new Proxy({}, { get:()=>({ filter:async()=>[], get:async()=>null, create:async()=>({}), update:async()=>({}), delete:async()=>({}) }) }), integrations:{ Core:{ UploadFile:async()=>({ file_url:'' }) } } };
+# Hawks Hub
 
-# Base44 Project
+Hawks Hub is the public athletics site and staff admin workspace for the AISM Hawks football and basketball programs. Supabase provides shared records, staff sign-in, media storage, row-level access controls, and live updates. Vercel hosts the Vite single-page app.
 
-Use this repository to run and edit the app locally, then publish changes back through db.
+## Run locally
 
-Any change pushed to the repo will also be reflected in the Base44 Builder.
-
-## Prerequisites
-
-1. Clone the repository using the project's Git URL.
-2. Navigate to the project directory.
-3. Install dependencies: `npm install`.
-4. Install the Base44 CLI: `npm install -g base44@latest`.
-5. Install [Deno](https://docs.deno.com/runtime/getting_started/installation/) — the local Base44 backend runs on it.
-
-Run `base44 --help` (or see the [CLI reference](https://docs.db.com/developers/references/cli/commands/introduction)) for the full command surface.
-
-## Run Locally
-
-Three commands, from the project root:
+Requirements: Node.js 20.19+.
 
 ```bash
-base44 login   # one-time per machine
-base44 link    # one-time per clone
-base44 dev     # local backend + frontend together
+npm install
 ```
 
-Open the frontend URL that `base44 dev` prints (typically `http://localhost:5173`).
+Create `.env.local` from `.env.example`, then set the Supabase project URL and public anon/publishable key:
 
-Notes:
+```env
+VITE_SUPABASE_URL=https://your-project-ref.supabase.co
+VITE_SUPABASE_ANON_KEY=your-public-anon-or-publishable-key
+```
 
-- **Every fresh clone needs `base44 link`.** It writes `base44/.app.jsonc` (the app-id pointer), which is deliberately gitignored. Your app id is in the Builder URL (`app.db.com/apps/<id>/...`); `base44 link --help` shows the non-interactive flags.
-- **`base44 dev` runs the frontend for you** (via `site.serveCommand` in this repo's `base44/config.jsonc`) — never run `npm run dev` yourself: alone it serves a UI with no backend behind it (`[base44] Proxy not enabled`, every `/api` call fails), and alongside `base44 dev` the second Vite silently takes the next port and you end up looking at the wrong one.
-- **The app must be published at least once for the UI to load under `base44 dev`.** The frontend boots by fetching app settings from the hosted app; before the first publish that fails and every page redirects to login. The local API works regardless.
-- Entities, functions, and auth run locally — entity data is **in-memory only**, wiped when `base44 dev` restarts. Everything else (Core integrations, OAuth login) is forwarded to your deployed app. Full breakdown: [Local development overview](https://docs.db.com/developers/backend/overview/local-dev/local-development-overview).
+These browser-visible values are protected by Supabase Row Level Security. Never put a Supabase `service_role` key in this app, `.env.local`, or Vercel's `VITE_` environment variables.
 
-## Frontend Only, Hosted Backend
+Run the database migration in the Supabase SQL Editor:
 
-To work on just the frontend against your app's live hosted backend:
+```text
+supabase/migrations/20261021000000_hawks_hub.sql
+```
+
+Then start the app:
 
 ```bash
-base44 dev --remote
+npm run dev
 ```
 
-⚠️ In this mode writes go to your app's **production data** — plain `base44 dev` keeps everything local.
+Without a configured Supabase project, public pages show a backend configuration error and staff sign-in/admin edits remain unavailable; the app does not silently substitute browser-local data.
 
-## Publish Your Changes
+## Configure staff access
 
-After pushing your changes to git, open the Base44 dashboard and publish the app:
+1. In Supabase Authentication settings, set the site URL to the production website and allow the local development URL (`http://localhost:5173`) plus the production `/reset-password` redirect URL.
+2. Keep public sign-ups disabled. Create or invite each staff account through Supabase Authentication.
+3. For each administrator, set the trusted **App Metadata** role to `admin` in the Supabase Auth user record. Do not use editable User Metadata for authorization.
+4. Admin policies in the migration allow writes only when the signed-in JWT has `app_metadata.role = "admin"`. Public visitors can read published matches, active players, public seasons/opponents, and published gallery media. Drafts and archived records are private.
+
+Admin changes are written to Supabase, not to the current browser. Realtime database changes refresh open Hawks Hub pages; the public pages read the same shared records.
+
+## Publish with Vercel
+
+1. Push the project to a Git provider and import that repository in Vercel.
+2. Use Vercel's default Vite build settings (`npm run build`, output directory `dist`).
+3. Add `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` in the Vercel project's Environment Variables for Production and Preview.
+4. Deploy, then set the deployed URL as the Supabase Authentication Site URL and add it to the allowed redirect URLs.
+5. Open `/login` on the deployed site to verify staff sign-in, then make a draft change and publish a test record before announcing the site.
+
+`vercel.json` routes direct visits and refreshes on client-side paths back to the app.
+
+## Checks
 
 ```bash
-base44 dashboard open
+npm run build
+npm run lint
 ```
 
-This repo syncs to Base44 through git, so publish from the dashboard rather than `base44 deploy` — a CLI deploy ships your local tree directly, bypassing the sync, and the deployed state silently diverges from the repo.
+## React Bits Pro components
 
-## Docs & Support
+`components.json` is configured for the React Bits Starter and Pro shadcn registries. Add your license key to a local `.env.local` file (never commit it):
 
-GitHub integration: [https://docs.db.com/developers/app-code/local-development/github](https://docs.db.com/developers/app-code/local-development/github)
+```env
+REACTBITS_LICENSE_KEY=your-license-key
+```
 
-Local development: [https://docs.db.com/developers/backend/overview/local-dev/local-development-overview](https://docs.db.com/developers/backend/overview/local-dev/local-development-overview)
+Then install the bending marquee:
 
-Support: [https://app.db.com/support](https://app.db.com/support)
+```bash
+npx shadcn@latest add @reactbits-starter/bending-marquee-tw
+```
